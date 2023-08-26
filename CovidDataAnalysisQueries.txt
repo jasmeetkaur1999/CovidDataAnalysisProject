@@ -1,0 +1,159 @@
+﻿COVID DATA SQL QUERIES
+
+
+SELECT * FROM `coviddatastudy.CovidData.CovidDeath`
+  ORDER BY 3,4
+
+
+-- vaccine data
+
+
+SELECT * FROM `coviddatastudy.CovidData.Covid_Vaccination`
+  ORDER BY 3,4
+
+
+-- Total cases Every day per country
+
+
+SELECT location,date,total_cases,new_cases,total_deaths,population
+   FROM `coviddatastudy.CovidData.CovidDeath`
+   Order By 1,2
+
+
+-- Looking at total cases Vs Deaths
+--shows likelihood of dying if you contract covid in your country
+
+
+SELECT location,date,total_cases,total_deaths,(total_deaths/total_cases)*100 as DeathPercentage
+FROM `coviddatastudy.CovidData.Covid_Death`
+Where location = "Canada"
+Order By 1,2
+
+
+--looking at total cases VS Population
+SELECT location,date,total_cases,population,(total_cases/population)*100 as CovidPercentage
+FROM `coviddatastudy.CovidData.Covid_Death`
+Where location = "Canada"
+Order By 1,2
+
+
+-- Maximum infected country compared to poplulation
+
+
+SELECT location,date,Max(total_cases)as HighestInfectionCount,population,MAX((total_cases/population))*100 as CovidInfectedPercentage
+FROM `coviddatastudy.CovidData.Covid_Death`
+Where continent is not null
+
+
+GROUP BY location, date,population
+Order By CovidInfectedPercentage desc
+
+
+
+
+--Showing Countries with Highest Death Count
+Select  continent,location, Max(total_deaths) As DeathRatePercentage
+FROM `coviddatastudy.CovidData.Covid_Death`
+Where continent is not null
+GROUP BY continent, location
+ORDER BY DeathRatePercentage desc
+
+
+--Let's break down into Continent
+--Showing Continents with Highest Death Count
+Select  continent, Max(total_deaths) As DeathRatePercentage
+FROM `coviddatastudy.CovidData.Covid_Death`
+Where continent is not null
+GROUP BY continent
+ORDER BY DeathRatePercentage desc
+
+
+
+
+
+
+-- Global Numbers
+
+
+-- Finding out each day total cases, total deaths and deathPercentage
+
+
+Select date, SUM(new_cases) as Total_Cases, Sum(new_deaths) as Total_Deaths, Sum(new_deaths)/SUM(new_cases) as DeathPercentageRate
+From
+`coviddatastudy.CovidData.Covid_Death`
+where continent is not null
+GROUP BY date
+ORDER BY 1
+
+
+-- Find total cases, deaths and deathPercentage
+Select  SUM(new_cases) as Total_Cases, Sum(new_deaths) as Total_Deaths, Sum(new_deaths)/SUM(new_cases)*100 as DeathPercentageRate
+From `coviddatastudy.CovidData.Covid_Death`
+--where continent is not null
+ORDER BY 1
+
+
+
+
+--Joining Both covid_tables
+
+
+SELECT dea.continent,dea.location,dea.date,dea.population, vac.new_vaccinations
+From  `coviddatastudy.CovidData.Covid_Death` dea
+JOIN `coviddatastudy.CovidData.Covid_Vaccination` vac
+on dea.date= vac.date
+and dea.location = vac.location
+WHERE dea.continent is not null
+ORDER BY 2,3
+
+
+-- Looking at partition function with new_vaccination
+
+
+SELECT dea.continent,dea.location,dea.date,dea.population, vac.new_vaccinations,
+SUM(vac.new_vaccinations) OVER (PARTITION BY dea.location order by dea.location,dea.date) as RollingPeopleVaccinated
+From  `coviddatastudy.CovidData.Covid_Death` dea
+JOIN `coviddatastudy.CovidData.Covid_Vaccination` vac
+on dea.date= vac.date
+and dea.location = vac.location
+WHERE dea.continent is not null
+ORDER BY 2,3
+
+
+--- Creating new temp table to find out the vaccine Percentage using CTE
+
+
+With populationVSVaccinated
+as
+(
+SELECT dea.continent,dea.location,dea.date,dea.population, vac.new_vaccinations,
+SUM(vac.new_vaccinations) OVER (PARTITION BY dea.location order by dea.location,dea.date) as RollingPeopleVaccinated
+From  `coviddatastudy.CovidData.Covid_Death` dea
+JOIN `coviddatastudy.CovidData.Covid_Vaccination` vac
+on dea.date= vac.date
+and dea.location = vac.location
+--WHERE dea.continent is not null
+--ORDER BY 2,3
+)
+
+
+SELECT *,(RollingPeopleVaccinated/population)*100
+From populationVSVaccinated
+
+
+
+
+--- creating view to store data for later visulaization
+
+
+
+
+Create View PercentPopulationVaccinated as
+SELECT dea.continent,dea.location,dea.date,dea.population, vac.new_vaccinations,
+SUM(vac.new_vaccinations) OVER (PARTITION BY dea.location order by dea.location,dea.date) as RollingPeopleVaccinated
+From  `coviddatastudy.CovidData.Covid_Death` dea
+JOIN `coviddatastudy.CovidData.Covid_Vaccination` vac
+on dea.date= vac.date
+and dea.location = vac.location
+--WHERE dea.continent is not null
+--ORDER BY 2,3
